@@ -1,4 +1,4 @@
-import React from 'react';
+// React is used implicitly for JSX
 import { useNavigate } from 'react-router-dom';
 import { ethers } from 'ethers';
 import { motion } from 'framer-motion';
@@ -502,7 +502,7 @@ const Home = ({ account }) => {
             }}
           />
 
-          <Grid container spacing={4} sx={{ mb: 8, position: 'relative', zIndex: 1, mt: 4, px: { xs: 2, md: 6 }, maxWidth: '1200px', mx: 'auto' }}>
+          <Grid container spacing={4} sx={{ mb: 8, position: 'relative', zIndex: 1, mt: 0, px: { xs: 2, md: 6 }, maxWidth: '1200px', mx: 'auto' }}>
             {[
               {
                 number: '1',
@@ -560,10 +560,10 @@ const Home = ({ account }) => {
                     <Box
                       sx={{
                         position: 'absolute',
-                        top: '-40px', // Fixed position instead of using transform
-                        left: 'calc(50% - 35px)', // Center the 70px circle
-                        width: '70px', // Smaller for better proportion
-                        height: '70px', // Smaller for better proportion
+                        top: '10px', // Fixed position instead of using transform
+                        left: 'calc(50% - 20px)', // Center the 70px circle
+                        width: '50px', // Smaller for better proportion
+                        height: '50px', // Smaller for better proportion
                         borderRadius: '50%',
                         background: 'linear-gradient(135deg, #3f51b5 0%, #002984 100%)',
                         display: 'flex',
@@ -574,7 +574,18 @@ const Home = ({ account }) => {
                         border: '3px solid', // Thinner border
                         borderColor: theme.palette.mode === 'dark' ? '#0a1929' : 'white',
                         transition: 'all 0.3s ease',
-                        overflow: 'visible' // Ensure icon is not clipped
+                        overflow: 'visible', // Ensure icon is not clipped
+                        '&::before': {
+                          content: '""',
+                          position: 'absolute',
+                          top: '5px',
+                          left: '5px',
+                          width: '15px',
+                          height: '15px',
+                          borderRadius: '50%',
+                          background: 'rgba(255, 255, 255, 0.3)',
+                          zIndex: 1
+                        }
                       }}
                     >
                       <motion.div
@@ -594,16 +605,21 @@ const Home = ({ account }) => {
                           height: '100%'
                         }}
                       >
-                        {/* Icon with consistent styling */}
-                        {React.cloneElement(step.icon, {
-                          sx: {
-                            fontSize: 40, // Slightly smaller for better proportion
+                        {/* Using number instead of icon for reliability */}
+                        <Typography
+                          variant="h5"
+                          sx={{
                             color: 'white',
-                            filter: 'drop-shadow(0 0 3px rgba(255, 255, 255, 0.7))', // Enhanced glow
-                            transition: 'all 0.3s ease',
-                            display: 'block' // Ensure icon is displayed as block element
-                          }
-                        })}
+                            fontWeight: 'bold',
+                            textShadow: '0 0 5px rgba(255, 255, 255, 0.9)',
+                            fontSize: '1.8rem',
+                            letterSpacing: '0.05em',
+                            position: 'relative',
+                            zIndex: 2
+                          }}
+                        >
+                          {step.number}
+                        </Typography>
                       </motion.div>
                     </Box>
                     <CardContent sx={{
