@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Box,
   Button,
@@ -17,11 +18,16 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  Zoom,
+  Backdrop,
 } from '@mui/material';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import CancelIcon from '@mui/icons-material/Cancel';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
+import EventIcon from '@mui/icons-material/Event';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { verifyTicket, useTicket, getEventTicketingContract } from '../utils/contracts';
 import { ipfsToHTTP } from '../utils/ipfs';
@@ -40,70 +46,122 @@ const Validator = ({ account }) => {
   const qrScannerRef = useRef(null);
 
   useEffect(() => {
+    // Clean up scanner when component unmounts
     return () => {
-      // Clean up scanner when component unmounts
       if (qrScannerRef.current) {
-        qrScannerRef.current.clear();
+        try {
+          qrScannerRef.current.clear();
+          console.log("QR scanner cleared on unmount");
+        } catch (error) {
+          console.error("Error clearing QR scanner:", error);
+        }
       }
     };
   }, []);
 
+  // Reset error when ticket ID or owner changes
+  useEffect(() => {
+    if (ticketId || ticketOwner) {
+      setError('');
+    }
+  }, [ticketId, ticketOwner]);
+
   const handleStartScanner = () => {
     setScannerActive(true);
     setError('');
+    setValidationResult(null);
+    setTicketDetails(null);
 
     // Clear previous scanner instance
     if (qrScannerRef.current) {
-      qrScannerRef.current.clear();
+      try {
+        qrScannerRef.current.clear();
+        console.log("Previous scanner cleared");
+      } catch (error) {
+        console.error("Error clearing previous scanner:", error);
+      }
     }
 
-    // Initialize scanner with a smaller viewfinder and higher FPS
-    const scanner = new Html5QrcodeScanner(
-      "qr-reader",
-      {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        rememberLastUsedCamera: true,
-      },
-      /* verbose= */ false
-    );
+    // Reset ticket fields
+    setTicketId('');
+    setTicketOwner('');
 
-    const onScanSuccess = async (decodedText) => {
+    // Add a small delay before initializing the scanner to ensure DOM is ready
+    setTimeout(() => {
       try {
-        // Parse the QR code data
-        const data = JSON.parse(decodedText);
-        if (data.ticketId && data.owner) {
-          setTicketId(data.ticketId);
-          setTicketOwner(data.owner);
+        // Initialize scanner with optimized settings
+        const scanner = new Html5QrcodeScanner(
+          "qr-reader",
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+            rememberLastUsedCamera: true,
+            aspectRatio: 1.0,
+            showTorchButtonIfSupported: true,
+            showZoomSliderIfSupported: true,
+            defaultZoomValueIfSupported: 2,
+          },
+          /* verbose= */ false
+        );
 
-          // Stop scanner after successful scan
-          scanner.clear();
-          qrScannerRef.current = null;
-          setScannerActive(false);
+        const onScanSuccess = async (decodedText) => {
+          console.log("QR code scanned successfully:", decodedText);
+          try {
+            // Parse the QR code data
+            const data = JSON.parse(decodedText);
+            console.log("Parsed QR data:", data);
 
-          // Validate the ticket
-          await handleValidateTicket(data.ticketId, data.owner);
-        } else {
-          setError('Invalid QR code format');
-        }
-      } catch (error) {
-        console.error('Error parsing QR code:', error);
-        setError('Invalid QR code format. Please try again.');
+            if (data && data.ticketId && data.owner) {
+              setTicketId(data.ticketId);
+              setTicketOwner(data.owner);
+
+              // Stop scanner after successful scan
+              try {
+                scanner.clear();
+                console.log("Scanner cleared after successful scan");
+                qrScannerRef.current = null;
+                setScannerActive(false);
+              } catch (clearError) {
+                console.error("Error clearing scanner after scan:", clearError);
+              }
+
+              // Validate the ticket
+              await handleValidateTicket(data.ticketId, data.owner);
+            } else {
+              setError('Invalid QR code format: Missing ticket ID or owner information');
+              console.error('Invalid QR data structure:', data);
+            }
+          } catch (parseError) {
+            console.error('Error parsing QR code:', parseError);
+            setError('Could not parse QR code. Please make sure you are scanning a valid ticket QR code.');
+          }
+        };
+
+        const onScanFailure = (error) => {
+          // We don't need to show errors for each failed scan attempt
+          // Only log for debugging purposes
+          console.log(`QR scan error: ${error}`);
+        };
+
+        scanner.render(onScanSuccess, onScanFailure);
+        qrScannerRef.current = scanner;
+        console.log("QR scanner initialized");
+      } catch (initError) {
+        console.error("Error initializing QR scanner:", initError);
+        setError("Failed to start QR scanner. Please try again or enter ticket details manually.");
+        setScannerActive(false);
       }
-    };
-
-    const onScanFailure = (error) => {
-      // We don't need to show errors for each failed scan attempt
-      console.log(`QR scan error: ${error}`);
-    };
-
-    scanner.render(onScanSuccess, onScanFailure);
-    qrScannerRef.current = scanner;
+    }, 300);
   };
 
   const handleStopScanner = () => {
     if (qrScannerRef.current) {
-      qrScannerRef.current.clear();
+      try {
+        qrScannerRef.current.clear();
+        console.log("Scanner stopped by user");
+      } catch (error) {
+        console.error("Error stopping scanner:", error);
+      }
       qrScannerRef.current = null;
     }
     setScannerActive(false);
@@ -228,7 +286,31 @@ const Validator = ({ account }) => {
                   startIcon={<QrCodeScannerIcon />}
                   onClick={handleStartScanner}
                   fullWidth
-                  sx={{ mb: 2 }}
+                  sx={{
+                    mb: 2,
+                    background: 'linear-gradient(45deg, #3f51b5 30%, #757de8 90%)',
+                    boxShadow: '0 3px 5px 2px rgba(63, 81, 181, .3)',
+                    transition: 'all 0.3s ease',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    '&::after': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: '-100%',
+                      width: '100%',
+                      height: '100%',
+                      background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
+                      transition: 'all 0.5s',
+                    },
+                    '&:hover::after': {
+                      left: '100%',
+                    },
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 6px 10px rgba(0, 0, 0, 0.3)',
+                    },
+                  }}
                 >
                   Scan QR Code
                 </Button>
@@ -260,6 +342,19 @@ const Validator = ({ account }) => {
                   onClick={() => handleValidateTicket()}
                   disabled={loading || !ticketId || !ticketOwner}
                   fullWidth
+                  startIcon={loading ? null : <VerifiedIcon />}
+                  sx={{
+                    background: 'linear-gradient(45deg, #4caf50 30%, #80e27e 90%)',
+                    boxShadow: '0 3px 5px 2px rgba(76, 175, 80, .3)',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 6px 10px rgba(0, 0, 0, 0.3)',
+                    },
+                    '&:disabled': {
+                      background: 'rgba(0, 0, 0, 0.12)',
+                    }
+                  }}
                 >
                   {loading ? <CircularProgress size={24} /> : 'Validate'}
                 </Button>
@@ -272,15 +367,33 @@ const Validator = ({ account }) => {
                     width: '100%',
                     maxWidth: '500px',
                     margin: '0 auto',
-                    '& video': { borderRadius: 2 }
+                    '& video': { borderRadius: 2 },
+                    '& section': { position: 'relative' },
+                    '& section div:first-of-type': { border: '3px solid #3f51b5 !important', borderRadius: '8px !important' },
+                    '& button': { borderRadius: '4px !important' },
+                    '& select': { padding: '8px !important', borderRadius: '4px !important' },
+                    '& span.dbrScanner-result': { display: 'none !important' }
                   }}
                 />
+                {error && (
+                  <Alert severity="error" sx={{ mt: 2, mb: 2 }}>
+                    {error}
+                  </Alert>
+                )}
                 <Button
                   variant="outlined"
                   color="secondary"
                   onClick={handleStopScanner}
                   fullWidth
-                  sx={{ mt: 2 }}
+                  sx={{
+                    mt: 2,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      backgroundColor: 'rgba(244, 67, 54, 0.08)',
+                      transform: 'translateY(-2px)',
+                    }
+                  }}
+                  startIcon={<CancelIcon />}
                 >
                   Cancel Scanning
                 </Button>

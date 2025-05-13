@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ethers } from 'ethers';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { AnimatePresence } from 'framer-motion';
+import { Box } from '@mui/material';
 
 // Components
 import Navbar from './components/Navbar';
+import Footer from './components/Footer';
 import Home from './pages/Home';
 import Register from './pages/Register';
 import Events from './pages/Events';
@@ -14,39 +17,81 @@ import EventDetails from './pages/EventDetails';
 import MyTickets from './pages/MyTickets';
 import Admin from './pages/Admin';
 import Validator from './pages/Validator';
+import Profile from './pages/Profile';
+import About from './pages/About';
+import FAQ from './pages/FAQ';
+import Contact from './pages/Contact';
 import { isUserRegistered } from './utils/contracts';
 
-// Create a theme
-const theme = createTheme({
+// Theme configuration
+const getDesignTokens = (mode) => ({
   palette: {
-    mode: 'dark',
-    primary: {
-      main: '#3f51b5', // Indigo
-      light: '#757de8',
-      dark: '#002984',
-      contrastText: '#ffffff',
-    },
-    secondary: {
-      main: '#f50057', // Pink
-      light: '#ff5983',
-      dark: '#bb002f',
-      contrastText: '#ffffff',
-    },
-    success: {
-      main: '#4caf50',
-      light: '#80e27e',
-      dark: '#087f23',
-    },
-    error: {
-      main: '#f44336',
-      light: '#ff7961',
-      dark: '#ba000d',
-    },
-    background: {
-      default: '#0a1929', // Deep blue-black
-      paper: '#132f4c', // Slightly lighter blue
-    },
-    divider: 'rgba(255, 255, 255, 0.12)',
+    mode,
+    ...(mode === 'light'
+      ? {
+          // Light mode palette
+          primary: {
+            main: '#3f51b5', // Indigo
+            light: '#757de8',
+            dark: '#002984',
+            contrastText: '#ffffff',
+          },
+          secondary: {
+            main: '#f50057', // Pink
+            light: '#ff5983',
+            dark: '#bb002f',
+            contrastText: '#ffffff',
+          },
+          success: {
+            main: '#4caf50',
+            light: '#80e27e',
+            dark: '#087f23',
+          },
+          error: {
+            main: '#f44336',
+            light: '#ff7961',
+            dark: '#ba000d',
+          },
+          background: {
+            default: '#f5f5f5', // Light gray
+            paper: '#ffffff', // White
+          },
+          divider: 'rgba(0, 0, 0, 0.12)',
+          text: {
+            primary: '#212121',
+            secondary: '#757575',
+          },
+        }
+      : {
+          // Dark mode palette
+          primary: {
+            main: '#3f51b5', // Indigo
+            light: '#757de8',
+            dark: '#002984',
+            contrastText: '#ffffff',
+          },
+          secondary: {
+            main: '#f50057', // Pink
+            light: '#ff5983',
+            dark: '#bb002f',
+            contrastText: '#ffffff',
+          },
+          success: {
+            main: '#4caf50',
+            light: '#80e27e',
+            dark: '#087f23',
+          },
+          error: {
+            main: '#f44336',
+            light: '#ff7961',
+            dark: '#ba000d',
+          },
+          background: {
+            default: '#0a1929', // Deep blue-black
+            paper: '#132f4c', // Slightly lighter blue
+          },
+          divider: 'rgba(255, 255, 255, 0.12)',
+        }),
   },
   typography: {
     fontFamily: '"Poppins", "Roboto", "Helvetica", "Arial", sans-serif',
@@ -192,6 +237,15 @@ function App() {
   const [account, setAccount] = useState('');
   const [isRegistered, setIsRegistered] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState('dark'); // Default to dark mode
+
+  // Toggle theme function
+  const toggleColorMode = () => {
+    setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
+  };
+
+  // Create theme based on current mode
+  const theme = useMemo(() => createTheme(getDesignTokens(mode)), [mode]);
 
   useEffect(() => {
     const checkConnection = async () => {
@@ -249,72 +303,106 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
-        <Navbar account={account} isRegistered={isRegistered} />
-        <Routes>
-          <Route path="/" element={<Home account={account} />} />
-          <Route
-            path="/register"
-            element={
-              account ? (
-                isRegistered ? (
-                  <Navigate to="/events" replace />
+        <Box sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: '100vh',
+          bgcolor: theme.palette.mode === 'dark'
+            ? 'background.default'
+            : 'background.default',
+          backgroundImage: theme.palette.mode === 'dark'
+            ? 'radial-gradient(circle at 50% 14em, #313264 0%, #00023b 60%, #000114 100%)'
+            : 'radial-gradient(circle at 50% 14em, #f5f7fa 0%, #e4e8f0 60%, #d5dbe6 100%)',
+          backgroundAttachment: 'fixed'
+        }}>
+          <Navbar
+            account={account}
+            isRegistered={isRegistered}
+            mode={mode}
+            toggleColorMode={toggleColorMode}
+          />
+          <Box sx={{ flex: '1 0 auto', py: 2 }}>
+            <AnimatePresence mode="wait">
+              <Routes>
+            <Route path="/" element={<Home account={account} />} />
+            <Route
+              path="/register"
+              element={
+                account ? (
+                  isRegistered ? (
+                    <Navigate to="/events" replace />
+                  ) : (
+                    <Register account={account} setIsRegistered={setIsRegistered} />
+                  )
                 ) : (
-                  <Register account={account} setIsRegistered={setIsRegistered} />
+                  <Home account={account} />
                 )
-              ) : (
-                <Home account={account} />
-              )
-            }
-          />
-          <Route
-            path="/events"
-            element={
-              <ProtectedRoute>
-                <Events account={account} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/events/:id"
-            element={
-              <ProtectedRoute>
-                <EventDetails account={account} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/create-event"
-            element={
-              <ProtectedRoute>
-                <CreateEvent account={account} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/my-tickets"
-            element={
-              <ProtectedRoute>
-                <MyTickets account={account} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute>
-                <Admin account={account} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/validator"
-            element={
-              <ProtectedRoute>
-                <Validator account={account} />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
+              }
+            />
+            <Route
+              path="/events"
+              element={
+                <ProtectedRoute>
+                  <Events account={account} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/events/:id"
+              element={
+                <ProtectedRoute>
+                  <EventDetails account={account} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/create-event"
+              element={
+                <ProtectedRoute>
+                  <CreateEvent account={account} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-tickets"
+              element={
+                <ProtectedRoute>
+                  <MyTickets account={account} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <Admin account={account} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/validator"
+              element={
+                <ProtectedRoute>
+                  <Validator account={account} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile account={account} />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/about" element={<About />} />
+            <Route path="/faq" element={<FAQ />} />
+            <Route path="/contact" element={<Contact />} />
+          </Routes>
+            </AnimatePresence>
+          </Box>
+          <Footer />
+        </Box>
       </Router>
     </ThemeProvider>
   );
